@@ -11,7 +11,7 @@ import { gaugeChart } from "./Gauge.js";
 
 import { heatmapChart } from "./Heatmap.js";
 
-var data = donutChart;
+var data = barChart;
 
 let layoutTemplate = {
       "data": {
@@ -343,7 +343,7 @@ let layout = {
         b: 100   // bottom
     },
     hovermode: "closest",
-    clickmode: "select",
+    // clickmode removed to prevent default selection/flicker
     autotypenumbers: "strict",
     dragmode: false,
     legend:{
@@ -366,43 +366,70 @@ if (Array.isArray(data)) {
 Plotly.newPlot("myDiv", data, layout, { displayModeBar: false, responsive: true }).then(() => {
     const myDiv = document.getElementById("myDiv");
 
-    // --- custom tooltip ---
-    myDiv.on("plotly_hover", function (data) {
-        console.log(data)
-        const pt = data.points[0];
+    // --- custom tooltip & selection ---
+    let selectedPoint = null;
+    let lastClickTime = 0;
+
+    myDiv.on("plotly_click", function (data) {
+      const now = Date.now();
+      if (now - lastClickTime < 200) return; // 忽略重复触发
+      lastClickTime = now;
+    
+      console.log(data)
+      if (!data || !data.points || data.points.length === 0) {
+        console.log("🟦 Clicked empty space, hiding tooltip");
+        Plotly.restyle(myDiv, { selectedpoints: [null] });
+        selectedPoint = null;
         const tooltip = document.getElementById("custom-tooltip");
-      
-        if (!tooltip) return;
-      
-        // 显示横坐标作为 Header
+        if (tooltip) tooltip.style.opacity = 0;
+        return;
+      }
+
+      const tooltip = document.getElementById("custom-tooltip");
+      const pt = data.points[0];
+      if (!tooltip) return;
+
+      const curveIndex = pt.curveNumber;
+      const pointIndex = pt.pointIndex;
+
+      const isSamePoint = selectedPoint &&
+        selectedPoint.curve === curveIndex &&
+        selectedPoint.point === pointIndex;
+
+      if (isSamePoint) {
+        console.log("🟨 Clicked same point again, toggling off");
+        Plotly.restyle(myDiv, { selectedpoints: [null] }, [curveIndex]);
+        selectedPoint = null;
+        tooltip.style.opacity = 0;
+      } else {
+        console.log("🟩 Clicked new point, showing tooltip");
+        Plotly.restyle(myDiv, { selectedpoints: [[pointIndex]] }, [curveIndex]);
+        selectedPoint = { curve: curveIndex, point: pointIndex };
+
         const xLabel = pt.x;
         const label = pt.label;
-      
-        // 如果有多个点，可以显示多行，演示这里只一行
         const traceColor = pt.fullData.marker?.color || '#636efa';
         const traceName = pt.data.name || 'Trace';
         const value = pt.value;
         const yValue = pt.y;
-      
+
         tooltip.innerHTML = `
           <div class="tooltip-header">${label || xLabel}</div>
           <div class="tooltip-row">
-            <span class="tooltip-legned">            
+            <span class="tooltip-legend">            
                 <span class="tooltip-color" style="background:${traceColor};"> </span>
                 <span class="tooltip-label">${traceName}</span>
             </span>
             <span class="tooltip-value">${value || yValue}</span>
           </div>
         `;
-      
-        // 定位逻辑，确保 tooltip 不超出容器边缘
+
         const plotRect = myDiv.getBoundingClientRect();
         const tooltipWidth = tooltip.offsetWidth;
         const tooltipHeight = tooltip.offsetHeight;
         let left = data.event.clientX - tooltipWidth / 2;
         let top = data.event.clientY - tooltipHeight - 20;
 
-        // 边缘控制
         if (left + tooltipWidth > plotRect.right) {
           left = plotRect.right - tooltipWidth - 10;
         }
@@ -419,13 +446,7 @@ Plotly.newPlot("myDiv", data, layout, { displayModeBar: false, responsive: true 
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${top}px`;
         tooltip.style.opacity = 1;
-      });
-      
-      myDiv.on("plotly_unhover", function () {
-        const tooltip = document.getElementById("custom-tooltip");
-        if (tooltip) {
-          tooltip.style.opacity = 0;
-        }
-      });
-    // --- end tooltip ---
+      }
+    });
+    // --- end custom tooltip & selection ---
 });
