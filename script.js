@@ -8,12 +8,12 @@ import { scatterChart } from "./Scatter.js";
 import { pieChart } from "./Pie.js";
 import { donutChart } from "./Donut.js";
 import { heatmapChart } from "./Heatmap.js";
+import { histogramChart } from "./Histogram.js";
 //Style ugly
 import { gaugeChart } from "./Gauge.js";
-//Bug: click on one bar will toggle all bar 
-import { histogramChart } from "./Histogram.js";
 
-var data = histogramChart;
+
+var data = gaugeChart;
 
 let layoutTemplate = {
     data: {
@@ -310,22 +310,6 @@ Plotly.newPlot("myDiv", data, layout, {
             tooltip.style.opacity = 0;
         } else {
             console.log("🟩 Clicked new point, showing tooltip");
-            const selectableTypes = [
-                "bar",
-                "histogram",
-                "scatter",
-                "line",
-                "area",
-            ];
-            const updates = myDiv.data.map((trace, i) => {
-                if (selectableTypes.includes(trace.type)) {
-                    return i === curveIndex ? [pointIndex] : [null];
-                } else {
-                    return null;
-                }
-            });
-            Plotly.restyle(myDiv, { selectedpoints: updates });
-            selectedPoint = { curve: curveIndex, point: pointIndex };
 
             //Locate and change content in tooltip
             const xLabel = pt.x;
@@ -367,6 +351,24 @@ Plotly.newPlot("myDiv", data, layout, {
             tooltip.style.left = `${left}px`;
             tooltip.style.top = `${top}px`;
             tooltip.style.opacity = 1;
+
+            if (pt.data.type === "histogram") return;
+            const selectableTypes = [
+                "bar",
+                "histogram",
+                "scatter",
+                "line",
+                "area",
+            ];
+            const updates = myDiv.data.map((trace, i) => {
+                if (selectableTypes.includes(trace.type)) {
+                    return i === curveIndex ? [pointIndex] : [null];
+                } else {
+                    return null;
+                }
+            });
+            Plotly.restyle(myDiv, { selectedpoints: updates });
+            selectedPoint = { curve: curveIndex, point: pointIndex };
         }
     });
     // --- end custom tooltip & selection ---
